@@ -3,7 +3,7 @@ const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5005;
 
 const startServer = async () => {
     // Connect to MongoDB
