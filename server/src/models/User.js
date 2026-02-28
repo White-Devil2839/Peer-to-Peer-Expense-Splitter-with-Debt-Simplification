@@ -1,37 +1,51 @@
-const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
-/**
- * Middleware to protect routes.
- * Expects: Authorization: Bearer <token>
- */
-const protect = (req, res, next) => {
-    try {
-        let token;
+const userSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: [true, 'Name is required'],
+            trim: true,
+            minlength: [2, 'Name must be at least 2 characters'],
+            maxlength: [50, 'Name must be at most 50 characters'],
+        },
+        email: {
+            type: String,
+            required: [true, 'Email is required'],
+            unique: true,
+            lowercase: true,
+            trim: true,
+            match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
+        },
+        password: {
+            type: String,
+            required: [true, 'Password is required'],
+            minlength: [6, 'Password must be at least 6 characters'],
+            select: false, // Never return password by default
+        },
+    },
+    { timestamps: true }
+);
 
-        if (
-            req.headers.authorization &&
-            req.headers.authorization.startsWith('Bearer')
-        ) {
-            token = req.headers.authorization.split(' ')[1];
-        }
+// --------------- Pre-save: hash password ---------------
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+});
 
-        if (!token) {
-            return res.status(401).json({
-                success: false,
-                error: 'Not authorized – no token provided',
-            });
-        }
-
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = { id: decoded.id };
-        next();
-    } catch (error) {
-        return res.status(401).json({
-            success: false,
-            error: 'Not authorized – invalid token',
-        });
-    }
+// --------------- Instance method: compare password ---------------
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return bcrypt.compare(candidatePassword, this.password);
 };
 
-module.exports = { protect };
+// --------------- Strip password from JSON output ---------------
+userSchema.methods.toJSON = function () {
+    const obj = this.toObject();
+    delete obj.password;
+    return obj;
+};
+
+module.exports = mongoose.model('User', userSchema);

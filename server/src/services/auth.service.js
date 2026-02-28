@@ -51,6 +51,9 @@ const login = async ({ email, password }) => {
 
     const token = generateToken(user._id);
 
+    // Strip password before returning
+    user.password = undefined;
+
     return { user, token };
 };
 
