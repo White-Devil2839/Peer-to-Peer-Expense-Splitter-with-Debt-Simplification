@@ -1,19 +1,22 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const navLinks = [
   { to: '/', label: 'Home' },
   { to: '/dashboard', label: 'Dashboard' },
 ];
 
-const authLinks = [
-  { to: '/login', label: 'Login' },
-  { to: '/register', label: 'Sign Up' },
-];
-
 function Navbar() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-white/10">
@@ -45,24 +48,31 @@ function Navbar() {
 
             <div className="w-px h-6 bg-gray-700 mx-2" />
 
-            {authLinks.map((link) =>
-              link.to === '/register' ? (
-                <Link key={link.to} to={link.to} className="btn-primary text-sm !py-2 !px-4">
-                  {link.label}
-                </Link>
-              ) : (
+            {isAuthenticated ? (
+              <>
+                <span className="px-3 py-2 text-sm text-gray-300 font-medium">
+                  👋 {user?.name}
+                </span>
+                <button onClick={handleLogout} className="btn-secondary text-sm !py-2 !px-4">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
                 <Link
-                  key={link.to}
-                  to={link.to}
+                  to="/login"
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === link.to
+                    pathname === '/login'
                       ? 'bg-primary-600/20 text-primary-300'
                       : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                   }`}
                 >
-                  {link.label}
+                  Login
                 </Link>
-              )
+                <Link to="/register" className="btn-primary text-sm !py-2 !px-4">
+                  Sign Up
+                </Link>
+              </>
             )}
           </nav>
 
@@ -84,8 +94,8 @@ function Navbar() {
 
         {/* Mobile nav */}
         {mobileOpen && (
-          <nav className="md:hidden pb-4 space-y-1 animate-in fade-in slide-in-from-top-2">
-            {[...navLinks, ...authLinks].map((link) => (
+          <nav className="md:hidden pb-4 space-y-1">
+            {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -99,6 +109,37 @@ function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            {isAuthenticated ? (
+              <>
+                <span className="block px-4 py-2.5 text-sm text-gray-300 font-medium">
+                  👋 {user?.name}
+                </span>
+                <button
+                  onClick={() => { handleLogout(); setMobileOpen(false); }}
+                  className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </nav>
         )}
       </div>

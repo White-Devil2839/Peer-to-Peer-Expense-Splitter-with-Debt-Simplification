@@ -1,7 +1,13 @@
+import { useAuth } from '../context/AuthContext';
+
 function Dashboard() {
+  const { user } = useAuth();
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-2">
+        Welcome, {user?.name} 👋
+      </h1>
       <p className="text-gray-400 mb-8">Your groups and expenses at a glance.</p>
 
       {/* Placeholder cards — will be populated in later modules */}

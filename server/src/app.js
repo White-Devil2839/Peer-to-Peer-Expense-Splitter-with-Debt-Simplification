@@ -19,8 +19,8 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// --------------- Routes (will be added per module) ---------------
-// app.use('/api/auth',    require('./routes/auth.routes'));
+// --------------- Routes ---------------
+app.use('/api/auth', require('./routes/auth.routes'));
 // app.use('/api/groups',  require('./routes/group.routes'));
 // app.use('/api/expenses',require('./routes/expense.routes'));
 
