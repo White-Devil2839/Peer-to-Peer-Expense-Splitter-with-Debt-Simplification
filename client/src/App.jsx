@@ -7,6 +7,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CreateGroup from './pages/CreateGroup';
 import JoinGroup from './pages/JoinGroup';
+import GroupDetail from './pages/GroupDetail';
+import AddExpense from './pages/AddExpense';
 
 function App() {
   return (
@@ -38,6 +40,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <JoinGroup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groups/:groupId"
+            element={
+              <ProtectedRoute>
+                <GroupDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groups/:groupId/add-expense"
+            element={
+              <ProtectedRoute>
+                <AddExpense />
               </ProtectedRoute>
             }
           />

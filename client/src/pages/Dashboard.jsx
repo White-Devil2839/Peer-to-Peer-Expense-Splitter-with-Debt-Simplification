@@ -2,6 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { formatCurrency } from '../utils/money';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -66,9 +67,10 @@ function Dashboard() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {groups.map((group) => (
-              <div
+              <Link
+                to={`/groups/${group._id}`}
                 key={group._id}
-                className="card hover:border-primary-500/30 transition-colors group/card"
+                className="card hover:border-primary-500/30 transition-colors group/card cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-gray-100 group-hover/card:text-primary-300 transition-colors">
@@ -91,7 +93,7 @@ function Dashboard() {
                     <span>
                       Threshold:{' '}
                       {group.settlementThreshold > 0
-                        ? `${(group.settlementThreshold / 100).toFixed(2)}`
+                        ? formatCurrency(group.settlementThreshold)
                         : 'None'}
                     </span>
                   </div>
@@ -100,7 +102,7 @@ function Dashboard() {
                     <span>Created {new Date(group.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

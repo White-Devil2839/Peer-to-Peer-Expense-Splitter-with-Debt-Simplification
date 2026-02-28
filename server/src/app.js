@@ -22,7 +22,12 @@ app.get('/api/health', (_req, res) => {
 // --------------- Routes ---------------
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/groups', require('./routes/group.routes'));
-// app.use('/api/expenses',require('./routes/expense.routes'));
+app.use('/api/expenses', require('./routes/expense.routes'));
+
+// Group-scoped expense listing
+const { protect } = require('./middleware/auth');
+const { getGroupExpenses } = require('./controllers/expense.controller');
+app.get('/api/groups/:groupId/expenses', protect, getGroupExpenses);
 
 // --------------- Error Handler ---------------
 app.use(errorHandler);

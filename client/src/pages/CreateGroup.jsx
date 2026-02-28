@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { rupeesToPaise } from '../utils/money';
 
 function CreateGroup() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ function CreateGroup() {
       setApiError('');
       const payload = {
         name: data.name,
-        settlementThreshold: parseInt(data.settlementThreshold, 10) || 0,
+        settlementThreshold: rupeesToPaise(data.settlementThreshold || 0),
       };
       if (data.password && data.password.trim()) {
         payload.password = data.password;
@@ -84,19 +85,19 @@ function CreateGroup() {
           {/* Settlement Threshold */}
           <div>
             <label htmlFor="group-threshold" className="block text-sm font-medium text-gray-300 mb-1">
-              Settlement Threshold <span className="text-gray-500">(in cents/paise)</span>
+              Settlement Threshold <span className="text-gray-500">(₹ in rupees)</span>
             </label>
             <input
               id="group-threshold"
               type="number"
               min="0"
-              step="1"
-              placeholder="0"
+              step="0.01"
+              placeholder="0.00"
               className="input-field"
               {...register('settlementThreshold', {
                 min: { value: 0, message: 'Must be >= 0' },
                 validate: (v) =>
-                  v === '' || Number.isInteger(Number(v)) || 'Must be a whole number',
+                  v === '' || Number(v) >= 0 || 'Must be a non-negative number',
               })}
             />
             {errors.settlementThreshold && (
