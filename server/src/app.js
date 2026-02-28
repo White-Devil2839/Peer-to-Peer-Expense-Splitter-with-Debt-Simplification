@@ -21,7 +21,7 @@ app.get('/api/health', (_req, res) => {
 
 // --------------- Routes ---------------
 app.use('/api/auth', require('./routes/auth.routes'));
-// app.use('/api/groups',  require('./routes/group.routes'));
+app.use('/api/groups', require('./routes/group.routes'));
 // app.use('/api/expenses',require('./routes/expense.routes'));
 
 // --------------- Error Handler ---------------

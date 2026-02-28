@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import CreateGroup from './pages/CreateGroup';
+import JoinGroup from './pages/JoinGroup';
 
 function App() {
   return (
@@ -20,6 +22,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groups/create"
+            element={
+              <ProtectedRoute>
+                <CreateGroup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groups/join"
+            element={
+              <ProtectedRoute>
+                <JoinGroup />
               </ProtectedRoute>
             }
           />
