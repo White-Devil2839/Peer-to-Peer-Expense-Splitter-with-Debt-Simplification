@@ -1,19 +1,24 @@
 const Expense = require('../models/Expense');
 const Group = require('../models/Group');
+const Payment = require('../models/Payment');
 
 /**
  * Compute the net balance for every member in a group.
  *
  * Logic (all integer paise):
- *   For each expense:
+ *   Phase 1 — Expenses:
  *     net[paidBy]       += totalAmount
- *     net[split.user]   -= shareAmount   (for every split)
+ *     net[split.user]   -= shareAmount
+ *
+ *   Phase 2 — Payments:
+ *     net[payment.from] += payment.amount   (debtor's debt decreases)
+ *     net[payment.to]   -= payment.amount   (creditor's credit decreases)
  *
  * A positive net means the user is owed money (creditor).
  * A negative net means the user owes money (debtor).
  *
  * @param {string} groupId
- * @returns {{ balances: { userId: string, name: string, email: string, net: number }[] }}
+ * @returns {{ userId: string, name: string, email: string, net: number }[]}
  */
 const computeNetBalances = async (groupId) => {
     // 1. Verify group exists
@@ -24,8 +29,11 @@ const computeNetBalances = async (groupId) => {
         throw error;
     }
 
-    // 2. Fetch all expenses for this group
-    const expenses = await Expense.find({ group: groupId });
+    // 2. Fetch all expenses and payments for this group
+    const [expenses, payments] = await Promise.all([
+        Expense.find({ group: groupId }),
+        Payment.find({ group: groupId }),
+    ]);
 
     // 3. Initialize net map for all members at 0
     const netMap = {};
@@ -36,7 +44,7 @@ const computeNetBalances = async (groupId) => {
         memberInfo[id] = { name: member.name, email: member.email };
     }
 
-    // 4. Process each expense
+    // 4. Phase 1 — Process expenses
     for (const expense of expenses) {
         const payerId = expense.paidBy.toString();
 
@@ -54,7 +62,23 @@ const computeNetBalances = async (groupId) => {
         }
     }
 
-    // 5. Integrity check — sum of all nets must be exactly 0
+    // 5. Phase 2 — Apply payments
+    for (const payment of payments) {
+        const fromId = payment.from.toString();
+        const toId = payment.to.toString();
+
+        // Debtor's debt decreases (net moves toward 0)
+        if (netMap[fromId] !== undefined) {
+            netMap[fromId] += payment.amount;
+        }
+
+        // Creditor's credit decreases (net moves toward 0)
+        if (netMap[toId] !== undefined) {
+            netMap[toId] -= payment.amount;
+        }
+    }
+
+    // 6. Integrity check — sum of all nets must be exactly 0
     let totalNet = 0;
     for (const id of Object.keys(netMap)) {
         totalNet += netMap[id];
@@ -67,7 +91,7 @@ const computeNetBalances = async (groupId) => {
         throw error;
     }
 
-    // 6. Build result array
+    // 7. Build result array
     const balances = Object.entries(netMap).map(([userId, net]) => ({
         userId,
         name: memberInfo[userId]?.name || 'Unknown',
@@ -76,6 +100,39 @@ const computeNetBalances = async (groupId) => {
     }));
 
     return balances;
+};
+
+/**
+ * Compute threshold alerts.
+ *
+ * For each user with net < 0 whose abs(net) >= group.settlementThreshold:
+ *   Include in alerts array.
+ *
+ * @param {{ userId: string, name: string, net: number }[]} balances
+ * @param {number} settlementThreshold – integer paise (0 = always alert)
+ * @returns {{ userId: string, name: string, amountOwed: number }[]}
+ */
+const computeThresholdAlerts = (balances, settlementThreshold) => {
+    const alerts = [];
+
+    for (const b of balances) {
+        if (b.net < 0) {
+            const amountOwed = Math.abs(b.net);
+            // Threshold of 0 means always alert on any debt
+            if (settlementThreshold === 0 || amountOwed >= settlementThreshold) {
+                alerts.push({
+                    userId: b.userId,
+                    name: b.name,
+                    amountOwed,
+                });
+            }
+        }
+    }
+
+    // Sort by amount descending (largest debts first)
+    alerts.sort((a, b) => b.amountOwed - a.amountOwed);
+
+    return alerts;
 };
 
 /**
@@ -134,4 +191,4 @@ const buildRawDebtGraph = async (groupId) => {
     return Object.values(edgeMap).filter((e) => e.amount > 0);
 };
 
-module.exports = { computeNetBalances, buildRawDebtGraph };
+module.exports = { computeNetBalances, computeThresholdAlerts, buildRawDebtGraph };

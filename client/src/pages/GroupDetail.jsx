@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
-import { formatCurrency } from '../utils/money';
+import { formatCurrency, rupeesToPaise } from '../utils/money';
 import { useAuth } from '../context/AuthContext';
 import * as d3 from 'd3';
 
@@ -37,7 +37,7 @@ function DebtGraph({ edges, members, title, colorClass }) {
 
     const nodes = Array.from(nodeIds).map((id) => {
       const m = members.find((mem) => mem._id === id || mem.userId === id);
-      return { id, name: m?.name || m?.fromName || id.slice(-4) };
+      return { id, name: m?.name || id.slice(-4) };
     });
 
     const links = edges.map((e) => ({
@@ -46,7 +46,6 @@ function DebtGraph({ edges, members, title, colorClass }) {
       amount: e.amount,
     }));
 
-    // Force simulation
     const simulation = d3
       .forceSimulation(nodes)
       .force('link', d3.forceLink(links).id((d) => d.id).distance(140))
@@ -54,7 +53,6 @@ function DebtGraph({ edges, members, title, colorClass }) {
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(40));
 
-    // Arrow marker
     svg
       .append('defs')
       .append('marker')
@@ -69,7 +67,6 @@ function DebtGraph({ edges, members, title, colorClass }) {
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', colorClass === 'green' ? '#22c55e' : '#f97316');
 
-    // Links
     const link = svg
       .append('g')
       .selectAll('line')
@@ -79,7 +76,6 @@ function DebtGraph({ edges, members, title, colorClass }) {
       .attr('stroke-width', 2)
       .attr('marker-end', `url(#arrow-${title.replace(/\s/g, '')})`);
 
-    // Link labels
     const linkLabel = svg
       .append('g')
       .selectAll('text')
@@ -90,7 +86,6 @@ function DebtGraph({ edges, members, title, colorClass }) {
       .attr('text-anchor', 'middle')
       .text((d) => formatCurrency(d.amount));
 
-    // Nodes
     const node = svg
       .append('g')
       .selectAll('g')
@@ -100,55 +95,36 @@ function DebtGraph({ edges, members, title, colorClass }) {
         d3.drag()
           .on('start', (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
+            d.fx = d.x; d.fy = d.y;
           })
-          .on('drag', (event, d) => {
-            d.fx = event.x;
-            d.fy = event.y;
-          })
+          .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
           .on('end', (event, d) => {
             if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
+            d.fx = null; d.fy = null;
           })
       );
 
-    node
-      .append('circle')
-      .attr('r', 22)
+    node.append('circle').attr('r', 22)
       .attr('fill', '#1f2937')
       .attr('stroke', colorClass === 'green' ? '#22c55e' : '#f97316')
       .attr('stroke-width', 2);
 
-    node
-      .append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '.35em')
-      .attr('fill', '#e5e7eb')
-      .attr('font-size', '10px')
+    node.append('text').attr('text-anchor', 'middle').attr('dy', '.35em')
+      .attr('fill', '#e5e7eb').attr('font-size', '10px')
       .text((d) => d.name.split(' ')[0]);
 
     simulation.on('tick', () => {
-      link
-        .attr('x1', (d) => d.source.x)
-        .attr('y1', (d) => d.source.y)
-        .attr('x2', (d) => d.target.x)
-        .attr('y2', (d) => d.target.y);
-
-      linkLabel
-        .attr('x', (d) => (d.source.x + d.target.x) / 2)
+      link.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
+        .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
+      linkLabel.attr('x', (d) => (d.source.x + d.target.x) / 2)
         .attr('y', (d) => (d.source.y + d.target.y) / 2 - 8);
-
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     });
 
     return () => simulation.stop();
   }, [edges, members, title, colorClass]);
 
-  useEffect(() => {
-    draw();
-  }, [draw]);
+  useEffect(() => { draw(); }, [draw]);
 
   return (
     <div className="card">
@@ -170,31 +146,83 @@ function GroupDetail() {
   const [balances, setBalances] = useState([]);
   const [rawGraph, setRawGraph] = useState([]);
   const [simplifiedGraph, setSimplifiedGraph] = useState([]);
+  const [thresholdAlerts, setThresholdAlerts] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('expenses'); // 'expenses' | 'balances'
+  const [activeTab, setActiveTab] = useState('expenses');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [groupsRes, expensesRes, balancesRes] = await Promise.all([
-          api.get('/groups'),
-          api.get(`/groups/${groupId}/expenses`),
-          api.get(`/groups/${groupId}/balances`),
-        ]);
-        const found = groupsRes.data.data.groups.find((g) => g._id === groupId);
-        setGroup(found || null);
-        setExpenses(expensesRes.data.data.expenses);
-        setBalances(balancesRes.data.data.balances);
-        setRawGraph(balancesRes.data.data.rawGraph);
-        setSimplifiedGraph(balancesRes.data.data.simplifiedGraph);
-      } catch (err) {
-        console.error('Failed to load group data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  // Payment form state
+  const [payFrom, setPayFrom] = useState('');
+  const [payTo, setPayTo] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payError, setPayError] = useState('');
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [paySuccess, setPaySuccess] = useState('');
+
+  const fetchAllData = useCallback(async () => {
+    try {
+      const [groupsRes, expensesRes, balancesRes, paymentsRes] = await Promise.all([
+        api.get('/groups'),
+        api.get(`/groups/${groupId}/expenses`),
+        api.get(`/groups/${groupId}/balances`),
+        api.get(`/groups/${groupId}/payments`),
+      ]);
+      const found = groupsRes.data.data.groups.find((g) => g._id === groupId);
+      setGroup(found || null);
+      setExpenses(expensesRes.data.data.expenses);
+      setBalances(balancesRes.data.data.balances);
+      setRawGraph(balancesRes.data.data.rawGraph);
+      setSimplifiedGraph(balancesRes.data.data.simplifiedGraph);
+      setThresholdAlerts(balancesRes.data.data.thresholdAlerts || []);
+      setPayments(paymentsRes.data.data.payments);
+    } catch (err) {
+      console.error('Failed to load group data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [groupId]);
+
+  useEffect(() => { fetchAllData(); }, [fetchAllData]);
+
+  const handlePayment = async (e) => {
+    e.preventDefault();
+    setPayError('');
+    setPaySuccess('');
+
+    const amountPaise = rupeesToPaise(payAmount);
+    if (amountPaise < 1) {
+      setPayError('Amount must be at least ₹0.01');
+      return;
+    }
+    if (!payFrom || !payTo) {
+      setPayError('Select both debtor and creditor');
+      return;
+    }
+    if (payFrom === payTo) {
+      setPayError('Cannot pay yourself');
+      return;
+    }
+
+    setPaySubmitting(true);
+    try {
+      await api.post(`/groups/${groupId}/payments`, {
+        from: payFrom,
+        to: payTo,
+        amount: amountPaise,
+      });
+      setPaySuccess('Payment recorded!');
+      setPayFrom('');
+      setPayTo('');
+      setPayAmount('');
+      // Refresh all data
+      setLoading(true);
+      await fetchAllData();
+    } catch (err) {
+      setPayError(err.response?.data?.error || 'Failed to record payment');
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -208,12 +236,14 @@ function GroupDetail() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-10 text-center">
         <p className="text-red-400">Group not found.</p>
-        <Link to="/dashboard" className="text-primary-400 text-sm mt-2 inline-block">
-          ← Back to Dashboard
-        </Link>
+        <Link to="/dashboard" className="text-primary-400 text-sm mt-2 inline-block">← Back to Dashboard</Link>
       </div>
     );
   }
+
+  // Derive debtors and creditors from balances for payment dropdowns
+  const debtors = balances.filter((b) => b.net < 0);
+  const creditors = balances.filter((b) => b.net > 0);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -232,10 +262,7 @@ function GroupDetail() {
             )}
           </div>
         </div>
-        <Link
-          to={`/groups/${groupId}/add-expense`}
-          className="btn-primary text-sm mt-4 sm:mt-0"
-        >
+        <Link to={`/groups/${groupId}/add-expense`} className="btn-primary text-sm mt-4 sm:mt-0">
           + Add Expense
         </Link>
       </div>
@@ -244,33 +271,48 @@ function GroupDetail() {
       <section className="mb-6">
         <div className="flex flex-wrap gap-2">
           {group.members?.map((m) => (
-            <span
-              key={m._id}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
-                m._id === user?._id
-                  ? 'bg-primary-600/20 border-primary-500/30 text-primary-300'
-                  : 'bg-gray-800 border-gray-700 text-gray-300'
-              }`}
-            >
+            <span key={m._id} className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+              m._id === user?._id
+                ? 'bg-primary-600/20 border-primary-500/30 text-primary-300'
+                : 'bg-gray-800 border-gray-700 text-gray-300'
+            }`}>
               {m.name}{m._id === user?._id ? ' (You)' : ''}
             </span>
           ))}
         </div>
       </section>
 
+      {/* Threshold Alerts */}
+      {thresholdAlerts.length > 0 && (
+        <div className="mb-6 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          <h3 className="text-sm font-semibold text-yellow-300 mb-2">⚠️ Settlement Alerts</h3>
+          <div className="space-y-1">
+            {thresholdAlerts.map((alert) => (
+              <p key={alert.userId} className="text-sm text-yellow-200">
+                <span className="font-medium">{alert.name}</span> owes {formatCurrency(alert.amountOwed)} (exceeds threshold)
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tab Toggle */}
-      <div className="flex gap-2 mb-6">
-        {['expenses', 'balances'].map((tab) => (
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {[
+          { key: 'expenses', label: '💰 Expenses' },
+          { key: 'balances', label: '📊 Balances' },
+          { key: 'payments', label: '💳 Payments' },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab
+              activeTab === tab.key
                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
-            {tab === 'expenses' ? '💰 Expenses' : '📊 Balances & Settlements'}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -278,18 +320,13 @@ function GroupDetail() {
       {/* ───── EXPENSES TAB ───── */}
       {activeTab === 'expenses' && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-200 mb-3">
-            Expenses ({expenses.length})
-          </h2>
-
+          <h2 className="text-lg font-semibold text-gray-200 mb-3">Expenses ({expenses.length})</h2>
           {expenses.length === 0 ? (
             <div className="card text-center py-10">
               <span className="text-4xl mb-3 block">💰</span>
               <h3 className="text-base font-semibold text-gray-300 mb-2">No expenses yet</h3>
               <p className="text-sm text-gray-500 mb-4">Add your first expense to start tracking.</p>
-              <Link to={`/groups/${groupId}/add-expense`} className="btn-primary text-sm">
-                + Add Expense
-              </Link>
+              <Link to={`/groups/${groupId}/add-expense`} className="btn-primary text-sm">+ Add Expense</Link>
             </div>
           ) : (
             <div className="space-y-3">
@@ -307,26 +344,19 @@ function GroupDetail() {
                         )}
                       </p>
                     </div>
-                    <span className="text-lg font-bold text-accent-400">
-                      {formatCurrency(exp.totalAmount)}
-                    </span>
+                    <span className="text-lg font-bold text-accent-400">{formatCurrency(exp.totalAmount)}</span>
                   </div>
                   <div className="mt-3 pt-3 border-t border-gray-800">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {exp.splits?.map((s) => (
-                        <div
-                          key={s._id}
-                          className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-1.5 text-xs"
-                        >
+                        <div key={s._id} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-1.5 text-xs">
                           <span className="text-gray-300 truncate mr-2">{s.user?.name}</span>
                           <span className="text-gray-400 font-mono">{formatCurrency(s.shareAmount)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    {new Date(exp.createdAt).toLocaleString()}
-                  </p>
+                  <p className="text-xs text-gray-600 mt-2">{new Date(exp.createdAt).toLocaleString()}</p>
                 </div>
               ))}
             </div>
@@ -356,31 +386,25 @@ function GroupDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {balances
-                      .slice()
-                      .sort((a, b) => b.net - a.net)
-                      .map((b) => (
-                        <tr key={b.userId} className="hover:bg-gray-800/30 transition-colors">
-                          <td className="px-4 py-3 text-gray-200">{b.name}</td>
-                          <td className={`px-4 py-3 text-right font-mono font-semibold ${
-                            b.net > 0 ? 'text-green-400' : b.net < 0 ? 'text-red-400' : 'text-gray-500'
+                    {balances.slice().sort((a, b) => b.net - a.net).map((b) => (
+                      <tr key={b.userId} className="hover:bg-gray-800/30 transition-colors">
+                        <td className="px-4 py-3 text-gray-200">{b.name}</td>
+                        <td className={`px-4 py-3 text-right font-mono font-semibold ${
+                          b.net > 0 ? 'text-green-400' : b.net < 0 ? 'text-red-400' : 'text-gray-500'
+                        }`}>
+                          {b.net > 0 ? '+' : ''}{formatCurrency(Math.abs(b.net))}{b.net < 0 ? ' owed' : ''}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            b.net > 0 ? 'bg-green-500/10 text-green-400'
+                              : b.net < 0 ? 'bg-red-500/10 text-red-400'
+                              : 'bg-gray-700 text-gray-400'
                           }`}>
-                            {b.net > 0 ? '+' : ''}{formatCurrency(Math.abs(b.net))}
-                            {b.net < 0 ? ' owed' : ''}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              b.net > 0
-                                ? 'bg-green-500/10 text-green-400'
-                                : b.net < 0
-                                ? 'bg-red-500/10 text-red-400'
-                                : 'bg-gray-700 text-gray-400'
-                            }`}>
-                              {b.net > 0 ? 'Gets back' : b.net < 0 ? 'Owes' : 'Settled'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                            {b.net > 0 ? 'Gets back' : b.net < 0 ? 'Owes' : 'Settled'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -389,18 +413,8 @@ function GroupDetail() {
 
           {/* Debt Graphs */}
           <div className="grid md:grid-cols-2 gap-6">
-            <DebtGraph
-              edges={rawGraph}
-              members={group.members}
-              title="Before Simplification"
-              colorClass="orange"
-            />
-            <DebtGraph
-              edges={simplifiedGraph}
-              members={group.members}
-              title="After Simplification (Min Cash Flow)"
-              colorClass="green"
-            />
+            <DebtGraph edges={rawGraph} members={group.members} title="Before Simplification" colorClass="orange" />
+            <DebtGraph edges={simplifiedGraph} members={group.members} title="After Simplification (Min Cash Flow)" colorClass="green" />
           </div>
 
           {/* Simplified Settlements List */}
@@ -417,14 +431,138 @@ function GroupDetail() {
                       <span className="text-gray-600">→</span>
                       <span className="text-green-400 font-medium">{edge.toName}</span>
                     </div>
-                    <span className="font-mono font-semibold text-primary-300">
-                      {formatCurrency(edge.amount)}
-                    </span>
+                    <span className="font-mono font-semibold text-primary-300">{formatCurrency(edge.amount)}</span>
                   </div>
                 ))}
               </div>
             </section>
           )}
+        </div>
+      )}
+
+      {/* ───── PAYMENTS TAB ───── */}
+      {activeTab === 'payments' && (
+        <div className="space-y-8">
+          {/* Record Payment Form */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-200 mb-3">Record Payment</h2>
+            <div className="card">
+              {payError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {payError}
+                </div>
+              )}
+              {paySuccess && (
+                <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                  {paySuccess}
+                </div>
+              )}
+
+              <form onSubmit={handlePayment} className="space-y-4">
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {/* From (Debtor) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">From (owes)</label>
+                    <select
+                      value={payFrom}
+                      onChange={(e) => setPayFrom(e.target.value)}
+                      className="input-field"
+                    >
+                      <option value="">Select debtor</option>
+                      {debtors.map((d) => (
+                        <option key={d.userId} value={d.userId}>
+                          {d.name} (owes {formatCurrency(Math.abs(d.net))})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* To (Creditor) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">To (is owed)</label>
+                    <select
+                      value={payTo}
+                      onChange={(e) => setPayTo(e.target.value)}
+                      className="input-field"
+                    >
+                      <option value="">Select creditor</option>
+                      {creditors.map((c) => (
+                        <option key={c.userId} value={c.userId}>
+                          {c.name} (owed {formatCurrency(c.net)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Amount */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Amount (₹)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₹</span>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        className="input-field pl-8"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={paySubmitting}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {paySubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Recording…
+                    </span>
+                  ) : (
+                    '💳 Record Payment'
+                  )}
+                </button>
+              </form>
+            </div>
+          </section>
+
+          {/* Payment History */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-200 mb-3">
+              Payment History ({payments.length})
+            </h2>
+            {payments.length === 0 ? (
+              <div className="card text-center py-8">
+                <span className="text-3xl mb-2 block">💳</span>
+                <p className="text-gray-400">No payments recorded yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {payments.map((p) => (
+                  <div key={p._id} className="card !p-3 flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-red-400 font-medium">{p.from?.name}</span>
+                        <span className="text-gray-600">paid</span>
+                        <span className="text-green-400 font-medium">{p.to?.name}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {new Date(p.createdAt).toLocaleString()}
+                        {p.createdBy && ` • by ${p.createdBy.name}`}
+                      </p>
+                    </div>
+                    <span className="font-mono font-semibold text-primary-300">
+                      {formatCurrency(p.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

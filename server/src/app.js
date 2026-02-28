@@ -28,8 +28,11 @@ app.use('/api/expenses', require('./routes/expense.routes'));
 const { protect } = require('./middleware/auth');
 const { getGroupExpenses } = require('./controllers/expense.controller');
 const { getGroupBalances } = require('./controllers/balance.controller');
+const { createPayment, getGroupPayments } = require('./controllers/payment.controller');
 app.get('/api/groups/:groupId/expenses', protect, getGroupExpenses);
 app.get('/api/groups/:groupId/balances', protect, getGroupBalances);
+app.post('/api/groups/:groupId/payments', protect, createPayment);
+app.get('/api/groups/:groupId/payments', protect, getGroupPayments);
 
 // --------------- Error Handler ---------------
 app.use(errorHandler);

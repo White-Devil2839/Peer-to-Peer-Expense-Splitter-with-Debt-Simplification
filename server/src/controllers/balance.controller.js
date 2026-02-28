@@ -1,4 +1,4 @@
-const { computeNetBalances, buildRawDebtGraph } = require('../services/balance.service');
+const { computeNetBalances, computeThresholdAlerts, buildRawDebtGraph } = require('../services/balance.service');
 const { minimizeTransactions } = require('../services/simplify.service');
 const Group = require('../models/Group');
 
@@ -6,9 +6,10 @@ const Group = require('../models/Group');
  * GET /api/groups/:groupId/balances
  *
  * Returns:
- *  - balances: net balance per member (integer paise)
+ *  - balances: net balance per member (integer paise, includes payments)
  *  - rawGraph: un-simplified debt edges
  *  - simplifiedGraph: minimum cash flow settlement edges
+ *  - thresholdAlerts: users whose debt exceeds group threshold
  */
 const getGroupBalances = async (req, res, next) => {
     try {
@@ -31,10 +32,14 @@ const getGroupBalances = async (req, res, next) => {
             });
         }
 
-        // Compute all three datasets
+        // Compute all datasets
         const balances = await computeNetBalances(groupId);
         const rawGraph = await buildRawDebtGraph(groupId);
         const simplifiedGraph = minimizeTransactions(balances);
+        const thresholdAlerts = computeThresholdAlerts(
+            balances,
+            group.settlementThreshold || 0
+        );
 
         res.status(200).json({
             success: true,
@@ -42,6 +47,7 @@ const getGroupBalances = async (req, res, next) => {
                 balances,
                 rawGraph,
                 simplifiedGraph,
+                thresholdAlerts,
             },
         });
     } catch (error) {
