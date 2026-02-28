@@ -24,10 +24,12 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/groups', require('./routes/group.routes'));
 app.use('/api/expenses', require('./routes/expense.routes'));
 
-// Group-scoped expense listing
+// Group-scoped routes
 const { protect } = require('./middleware/auth');
 const { getGroupExpenses } = require('./controllers/expense.controller');
+const { getGroupBalances } = require('./controllers/balance.controller');
 app.get('/api/groups/:groupId/expenses', protect, getGroupExpenses);
+app.get('/api/groups/:groupId/balances', protect, getGroupBalances);
 
 // --------------- Error Handler ---------------
 app.use(errorHandler);
