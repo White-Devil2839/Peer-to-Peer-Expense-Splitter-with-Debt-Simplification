@@ -1,141 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { formatCurrency, rupeesToPaise } from '../utils/money';
 import { useAuth } from '../context/AuthContext';
-import * as d3 from 'd3';
-
-// ─────────────── D3 Debt Graph Component ───────────────
-function DebtGraph({ edges, members, title, colorClass }) {
-  const svgRef = useRef(null);
-
-  const draw = useCallback(() => {
-    if (!svgRef.current || !members || members.length === 0) return;
-
-    const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
-
-    const width = svgRef.current.clientWidth || 500;
-    const height = 320;
-    svg.attr('viewBox', `0 0 ${width} ${height}`);
-
-    if (edges.length === 0) {
-      svg
-        .append('text')
-        .attr('x', width / 2)
-        .attr('y', height / 2)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#6b7280')
-        .attr('font-size', '14px')
-        .text('No debts');
-      return;
-    }
-
-    // Build node set from edges
-    const nodeIds = new Set();
-    edges.forEach((e) => { nodeIds.add(e.from); nodeIds.add(e.to); });
-
-    const nodes = Array.from(nodeIds).map((id) => {
-      const m = members.find((mem) => mem._id === id || mem.userId === id);
-      return { id, name: m?.name || id.slice(-4) };
-    });
-
-    const links = edges.map((e) => ({
-      source: e.from,
-      target: e.to,
-      amount: e.amount,
-    }));
-
-    const simulation = d3
-      .forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id((d) => d.id).distance(140))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(40));
-
-    svg
-      .append('defs')
-      .append('marker')
-      .attr('id', `arrow-${title.replace(/\s/g, '')}`)
-      .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 28)
-      .attr('refY', 0)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', colorClass === 'green' ? '#22c55e' : '#f97316');
-
-    const link = svg
-      .append('g')
-      .selectAll('line')
-      .data(links)
-      .join('line')
-      .attr('stroke', colorClass === 'green' ? '#22c55e44' : '#f9731644')
-      .attr('stroke-width', 2)
-      .attr('marker-end', `url(#arrow-${title.replace(/\s/g, '')})`);
-
-    const linkLabel = svg
-      .append('g')
-      .selectAll('text')
-      .data(links)
-      .join('text')
-      .attr('font-size', '10px')
-      .attr('fill', colorClass === 'green' ? '#4ade80' : '#fb923c')
-      .attr('text-anchor', 'middle')
-      .text((d) => formatCurrency(d.amount));
-
-    const node = svg
-      .append('g')
-      .selectAll('g')
-      .data(nodes)
-      .join('g')
-      .call(
-        d3.drag()
-          .on('start', (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x; d.fy = d.y;
-          })
-          .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
-          .on('end', (event, d) => {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null; d.fy = null;
-          })
-      );
-
-    node.append('circle').attr('r', 22)
-      .attr('fill', '#1f2937')
-      .attr('stroke', colorClass === 'green' ? '#22c55e' : '#f97316')
-      .attr('stroke-width', 2);
-
-    node.append('text').attr('text-anchor', 'middle').attr('dy', '.35em')
-      .attr('fill', '#e5e7eb').attr('font-size', '10px')
-      .text((d) => d.name.split(' ')[0]);
-
-    simulation.on('tick', () => {
-      link.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
-        .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
-      linkLabel.attr('x', (d) => (d.source.x + d.target.x) / 2)
-        .attr('y', (d) => (d.source.y + d.target.y) / 2 - 8);
-      node.attr('transform', (d) => `translate(${d.x},${d.y})`);
-    });
-
-    return () => simulation.stop();
-  }, [edges, members, title, colorClass]);
-
-  useEffect(() => { draw(); }, [draw]);
-
-  return (
-    <div className="card">
-      <h3 className="text-base font-semibold text-gray-200 mb-3">{title}</h3>
-      <p className="text-xs text-gray-500 mb-2">
-        {edges.length} transaction{edges.length !== 1 ? 's' : ''}
-      </p>
-      <svg ref={svgRef} className="w-full" style={{ height: 320 }} />
-    </div>
-  );
-}
+import DebtGraph from '../components/DebtGraph';
 
 // ─────────────── Main GroupDetail Page ───────────────
 function GroupDetail() {
@@ -411,10 +279,33 @@ function GroupDetail() {
             )}
           </section>
 
-          {/* Debt Graphs */}
+          {/* Transaction Reduction Stats */}
+          {rawGraph.length > 0 && (
+            <div className="card !p-4 flex flex-wrap items-center justify-center gap-8 text-center mb-2">
+              <div>
+                <p className="text-2xl font-bold text-orange-400">{rawGraph.length}</p>
+                <p className="text-xs text-gray-500">Raw Transactions</p>
+              </div>
+              <div className="text-2xl text-gray-600">→</div>
+              <div>
+                <p className="text-2xl font-bold text-green-400">{simplifiedGraph.length}</p>
+                <p className="text-xs text-gray-500">Simplified</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-primary-400">
+                  {rawGraph.length > 0
+                    ? Math.round(((rawGraph.length - simplifiedGraph.length) / rawGraph.length) * 100)
+                    : 0}%
+                </p>
+                <p className="text-xs text-gray-500">Reduction</p>
+              </div>
+            </div>
+          )}
+
+          {/* Debt Graphs — Side by Side */}
           <div className="grid md:grid-cols-2 gap-6">
-            <DebtGraph edges={rawGraph} members={group.members} title="Before Simplification" colorClass="orange" />
-            <DebtGraph edges={simplifiedGraph} members={group.members} title="After Simplification (Min Cash Flow)" colorClass="green" />
+            <DebtGraph nodes={group.members} edges={rawGraph} colorTheme="orange" title="Before Simplification" />
+            <DebtGraph nodes={group.members} edges={simplifiedGraph} colorTheme="green" title="After Simplification (Min Cash Flow)" />
           </div>
 
           {/* Simplified Settlements List */}
