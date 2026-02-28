@@ -139,11 +139,11 @@ The backend computes net balances and applies the optimization algorithm before 
 ```mermaid
 graph TD
 
-    User["User (Browser / Client)"] --> Frontend["React Frontend (Vite + Context API + Tailwind)"]
+    User["User (Browser / Client)"] --> Frontend["React Frontend - Vite, Context API, Tailwind"]
 
-    Frontend -->|HTTP Requests (REST APIs)| Backend["Express Backend API (Node.js)"]
+    Frontend -->|HTTP Requests| Backend["Express Backend API - Node.js"]
 
-    Backend -->|Compute Net Balances| Algorithm["Optimization Layer<br/>Minimum Cash Flow Algorithm"]
+    Backend -->|Compute Net Balances| Algorithm["Optimization Layer - Minimum Cash Flow"]
 
     Algorithm -->|Optimized Settlements| Backend
 
@@ -154,7 +154,7 @@ graph TD
     Backend -->|JSON Response| Frontend
 
     Backend --> Auth["JWT Authentication"]
-    Backend --> Socket["Socket.io (Real-time Chat)"]
+    Backend --> Socket["Socket.io Real-time Chat"]
 
     Socket --> Frontend
 ```
