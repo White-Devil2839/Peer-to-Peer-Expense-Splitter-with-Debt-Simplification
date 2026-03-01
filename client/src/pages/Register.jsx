@@ -27,17 +27,17 @@ function Register() {
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4">
       <div className="card max-w-md w-full">
         <h2 className="text-2xl font-bold text-center mb-6">Create Account</h2>
-        <p className="text-gray-400 text-center text-sm mb-8">Join PeerFlow and simplify your expenses</p>
+        <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-8">Join PeerFlow and simplify your expenses</p>
 
         {apiError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
             {apiError}
           </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label htmlFor="reg-name" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="reg-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Name
             </label>
             <input
@@ -56,7 +56,7 @@ function Register() {
             )}
           </div>
           <div>
-            <label htmlFor="reg-email" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Email
             </label>
             <input
@@ -74,7 +74,7 @@ function Register() {
             )}
           </div>
           <div>
-            <label htmlFor="reg-password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password
             </label>
             <input
@@ -105,7 +105,7 @@ function Register() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{' '}
-          <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium">
+          <Link to="/login" className="text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 font-medium">
             Sign In
           </Link>
         </p>

@@ -1,21 +1,22 @@
 const Expense = require('../models/Expense');
 const Group = require('../models/Group');
 const Payment = require('../models/Payment');
+const { autoResolveOverdue } = require('./overdue.service');
 
 /**
  * Compute the net balance for every member in a group.
  *
+ * CRITICAL: Only 'approved' expenses affect balances.
+ * Pending/rejected expenses are ignored.
+ *
  * Logic (all integer paise):
- *   Phase 1 — Expenses:
+ *   Phase 1 — Approved Expenses:
  *     net[paidBy]       += totalAmount
  *     net[split.user]   -= shareAmount
  *
  *   Phase 2 — Payments:
  *     net[payment.from] += payment.amount   (debtor's debt decreases)
  *     net[payment.to]   -= payment.amount   (creditor's credit decreases)
- *
- * A positive net means the user is owed money (creditor).
- * A negative net means the user owes money (debtor).
  *
  * @param {string} groupId
  * @returns {{ userId: string, name: string, email: string, net: number }[]}
@@ -29,9 +30,9 @@ const computeNetBalances = async (groupId) => {
         throw error;
     }
 
-    // 2. Fetch all expenses and payments for this group
+    // 2. Fetch ONLY approved expenses + all payments
     const [expenses, payments] = await Promise.all([
-        Expense.find({ group: groupId }),
+        Expense.find({ group: groupId, status: 'approved' }),
         Payment.find({ group: groupId }),
     ]);
 
@@ -44,16 +45,14 @@ const computeNetBalances = async (groupId) => {
         memberInfo[id] = { name: member.name, email: member.email };
     }
 
-    // 4. Phase 1 — Process expenses
+    // 4. Phase 1 — Process approved expenses
     for (const expense of expenses) {
         const payerId = expense.paidBy.toString();
 
-        // Payer gains the total amount (they paid upfront)
         if (netMap[payerId] !== undefined) {
             netMap[payerId] += expense.totalAmount;
         }
 
-        // Each split user owes their share
         for (const split of expense.splits) {
             const userId = split.user.toString();
             if (netMap[userId] !== undefined) {
@@ -67,12 +66,10 @@ const computeNetBalances = async (groupId) => {
         const fromId = payment.from.toString();
         const toId = payment.to.toString();
 
-        // Debtor's debt decreases (net moves toward 0)
         if (netMap[fromId] !== undefined) {
             netMap[fromId] += payment.amount;
         }
 
-        // Creditor's credit decreases (net moves toward 0)
         if (netMap[toId] !== undefined) {
             netMap[toId] -= payment.amount;
         }
@@ -99,14 +96,14 @@ const computeNetBalances = async (groupId) => {
         net,
     }));
 
+    // 8. Auto-resolve overdue statuses based on new balances
+    await autoResolveOverdue(groupId, balances);
+
     return balances;
 };
 
 /**
  * Compute threshold alerts.
- *
- * For each user with net < 0 whose abs(net) >= group.settlementThreshold:
- *   Include in alerts array.
  *
  * @param {{ userId: string, name: string, net: number }[]} balances
  * @param {number} settlementThreshold – integer paise (0 = always alert)
@@ -118,7 +115,6 @@ const computeThresholdAlerts = (balances, settlementThreshold) => {
     for (const b of balances) {
         if (b.net < 0) {
             const amountOwed = Math.abs(b.net);
-            // Threshold of 0 means always alert on any debt
             if (settlementThreshold === 0 || amountOwed >= settlementThreshold) {
                 alerts.push({
                     userId: b.userId,
@@ -129,19 +125,13 @@ const computeThresholdAlerts = (balances, settlementThreshold) => {
         }
     }
 
-    // Sort by amount descending (largest debts first)
     alerts.sort((a, b) => b.amountOwed - a.amountOwed);
 
     return alerts;
 };
 
 /**
- * Build the raw (un-simplified) debt graph from all expenses.
- *
- * For each expense, for each split where split.user !== paidBy:
- *   split.user owes paidBy → edge { from: split.user, to: paidBy, amount: shareAmount }
- *
- * Duplicate edges (same from→to) are aggregated by summing amounts.
+ * Build the raw (un-simplified) debt graph from APPROVED expenses only.
  *
  * @param {string} groupId
  * @returns {{ from: string, to: string, fromName: string, toName: string, amount: number }[]}
@@ -154,15 +144,14 @@ const buildRawDebtGraph = async (groupId) => {
         throw error;
     }
 
-    const expenses = await Expense.find({ group: groupId });
+    // CRITICAL: Only approved expenses
+    const expenses = await Expense.find({ group: groupId, status: 'approved' });
 
-    // Build member name lookup
     const memberNames = {};
     for (const m of group.members) {
         memberNames[m._id.toString()] = m.name;
     }
 
-    // Aggregate edges: key = "from|to"
     const edgeMap = {};
 
     for (const expense of expenses) {
@@ -171,7 +160,6 @@ const buildRawDebtGraph = async (groupId) => {
         for (const split of expense.splits) {
             const debtorId = split.user.toString();
 
-            // Skip self-debt (payer owes themselves nothing)
             if (debtorId === payerId) continue;
 
             const key = `${debtorId}|${payerId}`;

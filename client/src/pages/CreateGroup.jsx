@@ -36,12 +36,12 @@ function CreateGroup() {
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4">
       <div className="card max-w-lg w-full">
         <h2 className="text-2xl font-bold text-center mb-2">Create a Group</h2>
-        <p className="text-gray-400 text-center text-sm mb-8">
+        <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-8">
           Start splitting expenses with your friends
         </p>
 
         {apiError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
             {apiError}
           </div>
         )}
@@ -49,7 +49,7 @@ function CreateGroup() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Group Name */}
           <div>
-            <label htmlFor="group-name" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="group-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Group Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -70,7 +70,7 @@ function CreateGroup() {
 
           {/* Password (optional) */}
           <div>
-            <label htmlFor="group-password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="group-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password <span className="text-gray-500">(optional)</span>
             </label>
             <input
@@ -84,7 +84,7 @@ function CreateGroup() {
 
           {/* Settlement Threshold */}
           <div>
-            <label htmlFor="group-threshold" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="group-threshold" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Settlement Threshold <span className="text-gray-500">(₹ in rupees)</span>
             </label>
             <input

@@ -29,6 +29,22 @@ const splitSchema = new mongoose.Schema(
     { _id: true }
 );
 
+const approvalSchema = new mongoose.Schema(
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+        },
+        vote: {
+            type: String,
+            enum: ['approve', 'reject'],
+            required: true,
+        },
+    },
+    { _id: false }
+);
+
 const expenseSchema = new mongoose.Schema(
     {
         group: {
@@ -68,6 +84,25 @@ const expenseSchema = new mongoose.Schema(
                 message: 'At least one split is required',
             },
         },
+        // ── Approval System ──
+        status: {
+            type: String,
+            enum: ['pending', 'approved', 'rejected'],
+            default: 'pending',
+        },
+        approvals: {
+            type: [approvalSchema],
+            default: [],
+        },
+        requiredApprovals: {
+            type: Number,
+            min: [1, 'Required approvals must be >= 1'],
+            validate: {
+                validator: Number.isInteger,
+                message: 'Required approvals must be an integer',
+            },
+        },
+        // ── Recurring ──
         isRecurring: {
             type: Boolean,
             default: false,
@@ -93,5 +128,6 @@ const expenseSchema = new mongoose.Schema(
 
 // Index for fast group-level queries
 expenseSchema.index({ group: 1, createdAt: -1 });
+expenseSchema.index({ group: 1, status: 1 });
 
 module.exports = mongoose.model('Expense', expenseSchema);

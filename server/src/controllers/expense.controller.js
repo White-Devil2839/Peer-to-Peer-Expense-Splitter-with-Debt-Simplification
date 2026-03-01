@@ -85,4 +85,50 @@ const getGroupExpenses = async (req, res, next) => {
     }
 };
 
-module.exports = { addExpense, getGroupExpenses };
+/**
+ * POST /api/expenses/:expenseId/vote
+ * Vote on an expense (approve/reject).
+ */
+const voteOnExpense = async (req, res, next) => {
+    try {
+        const { expenseId } = req.params;
+        const { vote } = req.body;
+
+        if (!expenseId) {
+            return res.status(400).json({ success: false, error: 'Expense ID is required' });
+        }
+        if (!vote) {
+            return res.status(400).json({ success: false, error: 'Vote is required (approve/reject)' });
+        }
+
+        const expense = await expenseService.voteOnExpense(expenseId, req.user.id, vote);
+
+        res.status(200).json({
+            success: true,
+            data: { expense },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/groups/:groupId/pending-expenses
+ * Get pending expenses for a group.
+ */
+const getPendingExpenses = async (req, res, next) => {
+    try {
+        const { groupId } = req.params;
+
+        const expenses = await expenseService.getPendingExpenses(groupId, req.user.id);
+
+        res.status(200).json({
+            success: true,
+            data: { expenses },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { addExpense, getGroupExpenses, voteOnExpense, getPendingExpenses };

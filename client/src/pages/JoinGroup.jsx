@@ -33,8 +33,8 @@ function JoinGroup() {
         <div className="card max-w-md w-full text-center">
           <span className="text-5xl mb-4 block">🎉</span>
           <h2 className="text-2xl font-bold mb-2">You're In!</h2>
-          <p className="text-gray-400 mb-6">
-            You've joined <span className="text-primary-300 font-semibold">{joinedGroup.name}</span>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            You've joined <span className="text-primary-600 dark:text-primary-300 font-semibold">{joinedGroup.name}</span>
           </p>
           <button onClick={() => navigate('/dashboard')} className="btn-primary">
             Go to Dashboard
@@ -48,12 +48,12 @@ function JoinGroup() {
     <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4">
       <div className="card max-w-md w-full">
         <h2 className="text-2xl font-bold text-center mb-2">Join a Group</h2>
-        <p className="text-gray-400 text-center text-sm mb-8">
+        <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-8">
           Enter the group's join code to get started
         </p>
 
         {apiError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
             {apiError}
           </div>
         )}
@@ -61,7 +61,7 @@ function JoinGroup() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Join Code */}
           <div>
-            <label htmlFor="join-code" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="join-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Join Code <span className="text-red-400">*</span>
             </label>
             <input
@@ -80,7 +80,7 @@ function JoinGroup() {
 
           {/* Password (if required) */}
           <div>
-            <label htmlFor="join-password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="join-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password <span className="text-gray-500">(if required)</span>
             </label>
             <input

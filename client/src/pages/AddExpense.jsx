@@ -126,19 +126,19 @@ function AddExpense() {
     <div className="max-w-2xl mx-auto px-4 py-10">
       <button
         onClick={() => navigate(-1)}
-        className="text-gray-400 hover:text-gray-200 text-sm mb-6 flex items-center gap-1 transition-colors"
+        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm mb-6 flex items-center gap-1 transition-colors"
       >
         ← Back
       </button>
 
       <div className="card">
         <h2 className="text-2xl font-bold mb-1">Add Expense</h2>
-        <p className="text-gray-400 text-sm mb-6">
-          to <span className="text-primary-300 font-semibold">{group.name}</span>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+          to <span className="text-primary-600 dark:text-primary-300 font-semibold">{group.name}</span>
         </p>
 
         {apiError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm">
             {apiError}
           </div>
         )}
@@ -146,7 +146,7 @@ function AddExpense() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Description */}
           <div>
-            <label htmlFor="exp-desc" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="exp-desc" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Description <span className="text-red-400">*</span>
             </label>
             <input
@@ -163,7 +163,7 @@ function AddExpense() {
 
           {/* Total Amount */}
           <div>
-            <label htmlFor="exp-amount" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="exp-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Amount (₹) <span className="text-red-400">*</span>
             </label>
             <div className="relative">
@@ -188,7 +188,7 @@ function AddExpense() {
 
           {/* Paid By */}
           <div>
-            <label htmlFor="exp-paidby" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="exp-paidby" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Paid By <span className="text-red-400">*</span>
             </label>
             <select
@@ -210,7 +210,7 @@ function AddExpense() {
 
           {/* Split Type Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Split Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Split Type</label>
             <div className="flex gap-2">
               {['equal', 'custom'].map((type) => (
                 <button
@@ -220,7 +220,7 @@ function AddExpense() {
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     splitType === type
                       ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
                   {type === 'equal' ? '⚖️ Equal' : '✏️ Custom'}
@@ -231,7 +231,7 @@ function AddExpense() {
 
           {/* Member Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Split Among
             </label>
             <div className="space-y-2">
@@ -242,9 +242,9 @@ function AddExpense() {
                       type="checkbox"
                       checked={selectedMembers.includes(m._id)}
                       onChange={() => toggleMember(m._id)}
-                      className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 bg-gray-800"
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500 bg-white dark:bg-gray-800"
                     />
-                    <span className="text-sm text-gray-200">{m.name}</span>
+                    <span className="text-sm text-gray-800 dark:text-gray-200">{m.name}</span>
                   </label>
 
                   {splitType === 'custom' && selectedMembers.includes(m._id) && (
@@ -271,10 +271,10 @@ function AddExpense() {
             <input
               type="checkbox"
               id="exp-recurring"
-              className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 bg-gray-800"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500 bg-white dark:bg-gray-800"
               {...register('isRecurring')}
             />
-            <label htmlFor="exp-recurring" className="text-sm text-gray-300">
+            <label htmlFor="exp-recurring" className="text-sm text-gray-700 dark:text-gray-300">
               Recurring expense
             </label>
           </div>

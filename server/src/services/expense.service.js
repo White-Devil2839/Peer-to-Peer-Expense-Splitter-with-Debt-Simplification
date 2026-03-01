@@ -1,12 +1,11 @@
 const Expense = require('../models/Expense');
 const Group = require('../models/Group');
+const GroupMemberStatus = require('../models/GroupMemberStatus');
 const { isValidPaise } = require('../utils/money');
 
 /**
  * Compute equal-split shares deterministically.
  * Distributes remainder paise to the first N users so sum === totalAmount exactly.
- *
- * Example: 10000 paise / 3 users → [3334, 3333, 3333]
  *
  * @param {number} totalAmount – integer paise
  * @param {string[]} userIds – array of user ObjectId strings
@@ -15,7 +14,7 @@ const { isValidPaise } = require('../utils/money');
 const computeEqualSplits = (totalAmount, userIds) => {
     const count = userIds.length;
     const base = Math.floor(totalAmount / count);
-    const remainder = totalAmount - base * count; // always 0 <= remainder < count
+    const remainder = totalAmount - base * count;
 
     return userIds.map((userId, index) => ({
         user: userId,
@@ -26,9 +25,7 @@ const computeEqualSplits = (totalAmount, userIds) => {
 
 /**
  * Add an expense to a group.
- *
- * @param {object} data – { group, description, totalAmount, paidBy, equalSplit, splitUsers, splits, isRecurring, recurrence }
- * @param {string} userId – authenticated user's ID
+ * New expenses start as 'pending' unless group has only 1 member (auto-approve).
  */
 const addExpense = async (data, userId) => {
     const {
@@ -43,7 +40,7 @@ const addExpense = async (data, userId) => {
         recurrence,
     } = data;
 
-    // ---- 1. Verify group exists ----
+    // 1. Verify group exists
     const group = await Group.findById(groupId);
     if (!group) {
         const error = new Error('Group not found');
@@ -53,39 +50,50 @@ const addExpense = async (data, userId) => {
 
     const memberIds = group.members.map((m) => m.toString());
 
-    // ---- 2. Verify authenticated user is a member ----
+    // 2. Verify authenticated user is a member
     if (!memberIds.includes(userId.toString())) {
         const error = new Error('You are not a member of this group');
         error.statusCode = 403;
         throw error;
     }
 
-    // ---- 3. Verify paidBy is a member ----
+    // 3. Check group-scoped overdue status
+    const memberStatus = await GroupMemberStatus.findOne({
+        group: groupId,
+        user: userId,
+    });
+    if (memberStatus && memberStatus.status === 'overdue') {
+        const error = new Error(
+            'Overdue users are restricted from governance actions but may still settle debts.'
+        );
+        error.statusCode = 403;
+        throw error;
+    }
+
+    // 4. Verify paidBy is a member
     if (!memberIds.includes(paidBy.toString())) {
         const error = new Error('Payer must be a member of the group');
         error.statusCode = 400;
         throw error;
     }
 
-    // ---- 4. Validate totalAmount ----
+    // 5. Validate totalAmount
     if (!isValidPaise(totalAmount) || totalAmount < 1) {
         const error = new Error('Total amount must be a positive integer (paise)');
         error.statusCode = 400;
         throw error;
     }
 
-    // ---- 5. Build splits ----
+    // 6. Build splits
     let splits;
 
     if (equalSplit) {
-        // Equal split mode
         if (!splitUsers || !Array.isArray(splitUsers) || splitUsers.length === 0) {
             const error = new Error('Split users are required for equal split');
             error.statusCode = 400;
             throw error;
         }
 
-        // Verify all split users are members
         for (const uid of splitUsers) {
             if (!memberIds.includes(uid.toString())) {
                 const error = new Error(`User ${uid} is not a member of this group`);
@@ -94,7 +102,6 @@ const addExpense = async (data, userId) => {
             }
         }
 
-        // Check for duplicates
         const uniqueUsers = new Set(splitUsers.map((u) => u.toString()));
         if (uniqueUsers.size !== splitUsers.length) {
             const error = new Error('Duplicate users in split');
@@ -104,14 +111,12 @@ const addExpense = async (data, userId) => {
 
         splits = computeEqualSplits(totalAmount, splitUsers);
     } else {
-        // Custom split mode
         if (!customSplits || !Array.isArray(customSplits) || customSplits.length === 0) {
             const error = new Error('Splits are required');
             error.statusCode = 400;
             throw error;
         }
 
-        // Validate each split
         const seenUsers = new Set();
         let splitSum = 0;
 
@@ -122,14 +127,12 @@ const addExpense = async (data, userId) => {
                 throw error;
             }
 
-            // Check membership
             if (!memberIds.includes(split.user.toString())) {
                 const error = new Error(`User ${split.user} is not a member of this group`);
                 error.statusCode = 400;
                 throw error;
             }
 
-            // Check duplicates
             const uid = split.user.toString();
             if (seenUsers.has(uid)) {
                 const error = new Error('Duplicate users in splits');
@@ -138,7 +141,6 @@ const addExpense = async (data, userId) => {
             }
             seenUsers.add(uid);
 
-            // Validate shareAmount
             if (!isValidPaise(split.shareAmount)) {
                 const error = new Error('Each share amount must be a non-negative integer (paise)');
                 error.statusCode = 400;
@@ -148,7 +150,6 @@ const addExpense = async (data, userId) => {
             splitSum += split.shareAmount;
         }
 
-        // ---- 6. Verify sum of shares === totalAmount ----
         if (splitSum !== totalAmount) {
             const error = new Error(
                 `Sum of shares (${splitSum}) does not equal total amount (${totalAmount})`
@@ -164,7 +165,12 @@ const addExpense = async (data, userId) => {
         }));
     }
 
-    // ---- 7. Create expense ----
+    // 7. Compute approval requirements
+    const groupSize = memberIds.length;
+    const requiredApprovals = Math.ceil(groupSize / 2);
+    const autoApprove = groupSize === 1;
+
+    // 8. Create expense
     const expenseData = {
         group: groupId,
         createdBy: userId,
@@ -172,6 +178,9 @@ const addExpense = async (data, userId) => {
         totalAmount,
         paidBy,
         splits,
+        status: autoApprove ? 'approved' : 'pending',
+        approvals: [],
+        requiredApprovals,
         isRecurring: isRecurring || false,
     };
 
@@ -192,11 +201,103 @@ const addExpense = async (data, userId) => {
 };
 
 /**
+ * Vote on an expense (approve or reject).
+ *
+ * @param {string} expenseId
+ * @param {string} userId – voter
+ * @param {string} vote – 'approve' or 'reject'
+ */
+const voteOnExpense = async (expenseId, userId, vote) => {
+    // 1. Validate vote value
+    if (!['approve', 'reject'].includes(vote)) {
+        const error = new Error('Vote must be "approve" or "reject"');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // 2. Fetch expense
+    const expense = await Expense.findById(expenseId);
+    if (!expense) {
+        const error = new Error('Expense not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    // 3. Cannot vote on decided expenses
+    if (expense.status !== 'pending') {
+        const error = new Error(`Expense is already ${expense.status}`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // 4. Fetch group for membership check
+    const group = await Group.findById(expense.group);
+    if (!group) {
+        const error = new Error('Group not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const memberIds = group.members.map((m) => m.toString());
+
+    // 5. Must be a group member
+    if (!memberIds.includes(userId.toString())) {
+        const error = new Error('You are not a member of this group');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    // 6. Check group-scoped overdue status
+    const memberStatus = await GroupMemberStatus.findOne({
+        group: expense.group,
+        user: userId,
+    });
+    if (memberStatus && memberStatus.status === 'overdue') {
+        const error = new Error(
+            'Overdue users are restricted from governance actions but may still settle debts.'
+        );
+        error.statusCode = 403;
+        throw error;
+    }
+
+    // 7. Cannot vote twice
+    const alreadyVoted = expense.approvals.some(
+        (a) => a.user.toString() === userId.toString()
+    );
+    if (alreadyVoted) {
+        const error = new Error('You have already voted on this expense');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    // 8. Record vote
+    expense.approvals.push({ user: userId, vote });
+
+    // 9. Check thresholds
+    const approveCount = expense.approvals.filter((a) => a.vote === 'approve').length;
+    const rejectCount = expense.approvals.filter((a) => a.vote === 'reject').length;
+    const groupSize = memberIds.length;
+
+    if (approveCount >= expense.requiredApprovals) {
+        expense.status = 'approved';
+    } else if (rejectCount > groupSize - expense.requiredApprovals) {
+        expense.status = 'rejected';
+    }
+
+    await expense.save();
+
+    return expense.populate([
+        { path: 'paidBy', select: 'name email' },
+        { path: 'splits.user', select: 'name email' },
+        { path: 'createdBy', select: 'name email' },
+        { path: 'approvals.user', select: 'name email' },
+    ]);
+};
+
+/**
  * Get all expenses for a group.
- * Only accessible by group members.
  */
 const getGroupExpenses = async (groupId, userId) => {
-    // Verify group exists
     const group = await Group.findById(groupId);
     if (!group) {
         const error = new Error('Group not found');
@@ -204,7 +305,6 @@ const getGroupExpenses = async (groupId, userId) => {
         throw error;
     }
 
-    // Verify user is a member
     const isMember = group.members.some(
         (m) => m.toString() === userId.toString()
     );
@@ -218,9 +318,40 @@ const getGroupExpenses = async (groupId, userId) => {
         .populate('paidBy', 'name email')
         .populate('splits.user', 'name email')
         .populate('createdBy', 'name email')
+        .populate('approvals.user', 'name email')
         .sort({ createdAt: -1 });
 
     return expenses;
 };
 
-module.exports = { addExpense, getGroupExpenses, computeEqualSplits };
+/**
+ * Get pending expenses for a group.
+ */
+const getPendingExpenses = async (groupId, userId) => {
+    const group = await Group.findById(groupId);
+    if (!group) {
+        const error = new Error('Group not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const isMember = group.members.some(
+        (m) => m.toString() === userId.toString()
+    );
+    if (!isMember) {
+        const error = new Error('You are not a member of this group');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const expenses = await Expense.find({ group: groupId, status: 'pending' })
+        .populate('paidBy', 'name email')
+        .populate('splits.user', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('approvals.user', 'name email')
+        .sort({ createdAt: -1 });
+
+    return expenses;
+};
+
+module.exports = { addExpense, voteOnExpense, getGroupExpenses, getPendingExpenses, computeEqualSplits };

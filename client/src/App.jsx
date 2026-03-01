@@ -12,7 +12,7 @@ import AddExpense from './pages/AddExpense';
 
 function App() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950 text-slate-800 dark:text-slate-200 transition-colors duration-300">
       <Navbar />
       <main className="flex-1">
         <Routes>
