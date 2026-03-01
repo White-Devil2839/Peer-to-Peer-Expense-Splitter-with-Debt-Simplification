@@ -359,6 +359,42 @@ Every decision governed.
 
 ---
 
+# 🔑 Demo Accounts
+
+All demo accounts use the same password: **`demo1234`**
+
+| Name | Email | Password |
+|------|-------|----------|
+| Aarav Sharma | `aarav@demo.com` | `demo1234` |
+| Priya Patel | `priya@demo.com` | `demo1234` |
+| Rohan Gupta | `rohan@demo.com` | `demo1234` |
+| Sneha Iyer | `sneha@demo.com` | `demo1234` |
+| Kabir Mehta | `kabir@demo.com` | `demo1234` |
+
+---
+
+# 🛠️ Local Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/White-Devil2839/Peer-to-Peer-Expense-Splitter-with-Debt-Simplification.git
+cd Peer-to-Peer-Expense-Splitter-with-Debt-Simplification
+
+# Backend
+cd server
+npm install
+cp .env.example .env   # configure MONGODB_URI, JWT_SECRET, CLIENT_URL
+npm run seed           # seed demo data
+npm run dev            # starts on port 5005
+
+# Frontend (new terminal)
+cd client
+npm install
+npm run dev            # starts on port 5173
+```
+
+---
+
 <div align="center">
 
 Built for OverClock 2026  
